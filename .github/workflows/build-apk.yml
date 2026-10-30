@@ -1,0 +1,99 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - arena/**
+    paths:
+      - 'public/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare web assets
+        run: npm run prepare-web
+
+      - name: Verify required files
+        run: |
+          test -f public/vendor/jsQR.js || { echo "ERROR: jsQR.js missing"; exit 1; }
+          test -f public/vendor/qrcode.js || { echo "ERROR: qrcode.js missing"; exit 1; }
+          test -f public/vendor/rules.js || { echo "ERROR: rules.js missing"; exit 1; }
+          test -f public/vendor/ical.js || { echo "ERROR: ical.js missing"; exit 1; }
+          echo "All required files present"
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Inject Android assets
+        run: node scripts/inject-android-assets.js
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RheaSport-Physio-und-Fit-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 60
+
+      - name: Copy APK to artifacts
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/RheaSport-Physio-und-fit-debug.apk
+          echo "APK copied to artifacts/"
+
+      - name: Commit APK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/
+          if git diff --cached --quiet; then
+            echo "APK unchanged - no commit needed"
+          else
+            git commit -m "chore: Update debug APK [skip ci]"
+            git push
+          fi

@@ -13,7 +13,7 @@ fs.mkdirSync(out, { recursive: true });
 
 const kopien = [
   ['node_modules/jsqr/dist/jsQR.js', 'jsQR.js'],
-  ['node_modules/qrcode-generator/dist/qrcode.js', 'qrcode.js'],
+  ['node_modules/qrcode-generator/qrcode.js', 'qrcode.js'],
   ['lib/rules.js', 'rules.js'],
   ['lib/ical.js', 'ical.js'],
   ['lib/ocr-parser.js', 'ocr-parser.js'],

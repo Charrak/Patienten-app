@@ -1,0 +1,21 @@
+{
+  "appId": "de.rheasport.physioundfit",
+  "appName": "RheaSport Physio & fit",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f4f8fa"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "androidScaleType": "CENTER_CROP",
+      "backgroundColor": "#0b6b6b",
+      "showSpinner": false
+    }
+  }
+}

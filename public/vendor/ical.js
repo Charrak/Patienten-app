@@ -1,4 +1,5 @@
 (function () {
+/* Auto-generated from vendor/ical.js */
 /**
  * Geteilter Terminkalender (iCalendar/ICS).
  * Enthält Kurs-/Termindaten ohne Patientennamen (Art. 9 DSGVO:
@@ -98,5 +99,7 @@ function erstelleIcs(kurse, termine, trainerListe, einstellung) {
 
 module.exports = { erstelleIcs };
 if (typeof window !== 'undefined' && window) window.RSD_ICAL = module.exports;
+
+
 
 })();

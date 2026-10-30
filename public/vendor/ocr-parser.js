@@ -1,4 +1,5 @@
 (function () {
+/* Auto-generated from vendor/ocr-parser.js */
 /**
  * Verordnungs-Parser für Foto-OCR und PDF417-/Barcode-Inhalte.
  * Läuft im Node-Server, in Tests und im Browser/APK (window.RSD_OCR).
@@ -238,5 +239,7 @@ function parseBarcodeText(rohText) {
 
 module.exports = { ICD_FORMAT, istIcdFormat, normalisiereIcd, extrahiereIcd, parseOcrText, parseBarcodeText, findeDaten };
 if (typeof window !== 'undefined' && window) window.RSD_OCR = module.exports;
+
+
 
 })();

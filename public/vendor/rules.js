@@ -1,4 +1,5 @@
 (function () {
+/* Auto-generated from vendor/rules.js */
 /**
  * RSD-Regelwerk für die RehaSport-/Funktionstrainings-Verwaltung
  * Quellen (Pflichtmodul „RSD Rehasport für Verantwortliche“, BAR/RSD-Unterlagen):
@@ -591,5 +592,7 @@ module.exports = {
   pruefeKursZuordnung, parseDatum, tageZwischen, ICD_BEREICHE, pruefeIcd, findeIcdBereich,
 };
 if (typeof window !== 'undefined' && window) window.RSD_RULES = module.exports;
+
+
 
 })();

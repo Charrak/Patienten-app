@@ -1,0 +1,126 @@
+name: build-apk-from-zip
+
+# Liest eine ZIP-Datei aus dem Repository, entpackt sie und baut daraus die Android-APK.
+# ZIP einfach nach  upload/  hochladen (z. B. upload/Rheasport-Physio-und-fit-repariert.zip)
+# oder den Workflow manuell starten und den ZIP-Pfad angeben.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_path:
+        description: 'Pfad zur ZIP im Repo (leer = neueste ZIP in upload/)'
+        required: false
+        default: ''
+  push:
+    paths:
+      - 'upload/*.zip'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: APK aus ZIP bauen
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ZIP finden und entpacken
+        id: zip
+        run: |
+          ZIP="${{ github.event.inputs.zip_path }}"
+          if [ -z "$ZIP" ]; then
+            ZIP=$(ls -t upload/*.zip 2>/dev/null | head -n 1 || true)
+          fi
+          if [ -z "$ZIP" ] || [ ! -f "$ZIP" ]; then
+            echo "FEHLER: Keine ZIP gefunden. Bitte nach upload/ hochladen oder zip_path angeben."
+            exit 1
+          fi
+          echo "Verwende ZIP: $ZIP"
+          rm -rf _zip _app
+          mkdir _zip
+          unzip -q "$ZIP" -d _zip
+          # Falls die ZIP genau einen Oberordner enthält (z. B. Rheasport-...-main/), diesen verwenden
+          if [ "$(ls -A _zip | wc -l)" = "1" ] && [ -d "_zip/$(ls -A _zip)" ]; then
+            mv "_zip/$(ls -A _zip)" _app
+          else
+            mv _zip _app
+          fi
+          test -f _app/package.json || { echo "FEHLER: package.json fehlt in der ZIP"; exit 1; }
+          ls _app
+
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Java 21 (Gradle/AGP)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle-Cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Abhängigkeiten installieren
+        working-directory: _app
+        run: |
+          npm install --no-audit --no-fund
+
+      - name: Web-Assets vorbereiten
+        working-directory: _app
+        run: npm run prepare-web
+
+      - name: Prüfen, dass PDF417-Decoder und OCR-Daten eingebettet sind
+        working-directory: _app
+        run: |
+          test -f public/vendor/zxing.js || { echo "FEHLER: public/vendor/zxing.js fehlt (PDF417)"; exit 1; }
+          test -f public/vendor/tesseract/lang/deu.traineddata.gz || { echo "FEHLER: deu.traineddata.gz fehlt (OCR)"; exit 1; }
+          test -f public/vendor/tesseract/tesseract.min.js || { echo "FEHLER: tesseract.min.js fehlt (OCR)"; exit 1; }
+
+      - name: Tests (Lokalmodus-API)
+        working-directory: _app
+        run: npm test
+
+      - name: Capacitor-Android-Projekt anlegen
+        working-directory: _app
+        run: npx cap add android
+
+      - name: Icons + CAMERA-Permission eintragen
+        working-directory: _app
+        run: node scripts/inject-android-assets.js
+
+      - name: Web-Assets einbetten
+        working-directory: _app
+        run: npx cap sync android
+
+      - name: Debug-APK bauen
+        working-directory: _app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: APK als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: RheaSport-APK
+          path: _app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 60
+
+      - name: APK ins Repository committen
+        run: |
+          mkdir -p artifacts
+          cp _app/android/app/build/outputs/apk/debug/app-debug.apk artifacts/RheaSport-Physio-und-fit-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/
+          if git diff --cached --quiet; then
+            echo "APK unverändert – kein Commit."
+          else
+            git commit -m "APK: Debug-Build aus ZIP vom $(date -u +%F) [skip ci]"
+            git push
+          fi

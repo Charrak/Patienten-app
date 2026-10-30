@@ -97,8 +97,57 @@ jobs:
         working-directory: _app
         run: npx cap sync android
 
-      - name: Debug-APK bauen
+      # Fester Signatur-Schlüssel: gleicher SHA-1-Fingerabdruck bei jedem Build
+      # -> Google-Anmeldung (OAuth) bleibt gültig, und die App lässt sich per Update installieren
+      #    (ohne Deinstallation = ohne Datenverlust). Secrets: siehe Hinweis in der Anleitung.
+      - name: Signatur-Schlüssel einrichten (fester Keystore)
         working-directory: _app/android
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::warning::Secret ANDROID_KEYSTORE_BASE64 fehlt - die APK wird mit einem zufaelligen Debug-Schluessel signiert. Google-Anmeldung und Updates ohne Deinstallation funktionieren so NICHT dauerhaft."
+            exit 0
+          fi
+          if [ -z "$KS_PASS" ] || [ -z "$KS_ALIAS" ]; then
+            echo "FEHLER: ANDROID_KEYSTORE_PASSWORD und ANDROID_KEY_ALIAS muessen als Secrets gesetzt sein."
+            exit 1
+          fi
+          KS="$RUNNER_TEMP/rheasport.keystore"
+          echo "$KS_B64" | base64 -d > "$KS"
+          keytool -list -v -keystore "$KS" -alias "$KS_ALIAS" -storepass "$KS_PASS" > "$RUNNER_TEMP/ks-info.txt" \
+            || { echo "FEHLER: Keystore/Alias/Passwort passen nicht zusammen."; exit 1; }
+          SHA1=$(grep -m1 'SHA1:' "$RUNNER_TEMP/ks-info.txt" | sed 's/.*SHA1: *//')
+          echo "Signatur-SHA-1 (fuer die Google-Cloud-Client-ID): $SHA1"
+          { echo "### Signatur-Fingerabdruck"; echo; echo "SHA-1: \`$SHA1\`"; } >> "$GITHUB_STEP_SUMMARY"
+          echo "RHEA_KEYSTORE=$KS" >> "$GITHUB_ENV"
+          cat >> app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  rheasport {
+                      storeFile file(System.getenv('RHEA_KEYSTORE'))
+                      storePassword System.getenv('RHEA_KS_PASS')
+                      keyAlias System.getenv('RHEA_KEY_ALIAS')
+                      keyPassword System.getenv('RHEA_KEY_PASS')
+                  }
+              }
+              buildTypes {
+                  debug { signingConfig signingConfigs.rheasport }
+                  release { signingConfig signingConfigs.rheasport }
+              }
+          }
+          GRADLE
+
+      - name: APK bauen (signiert)
+        working-directory: _app/android
+        env:
+          RHEA_KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RHEA_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RHEA_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD != '' && secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
@@ -124,3 +173,4 @@ jobs:
             git commit -m "APK: Debug-Build aus ZIP vom $(date -u +%F) [skip ci]"
             git push
           fi
+          

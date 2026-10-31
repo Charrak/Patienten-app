@@ -1,0 +1,27 @@
+{
+  "name": "rheasport-physio-und-fit",
+  "version": "1.0.0",
+  "description": "RheaSport Physio & Fit - Patientenverwaltung für Rehabilitationssport",
+  "main": "server.js",
+  "scripts": {
+    "prepare-web": "node scripts/prepare-web.js",
+    "prestart": "node scripts/prepare-web.js",
+    "test": "node scripts/test-local-api.js && node scripts/test-parser.js",
+    "start": "node server.js",
+    "build:android": "npm run prepare-web && npx cap add android && node scripts/inject-android-assets.js && npx cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "keywords": ["rehasport", "physiotherapy", "patient-management", "android"],
+  "author": "RheaSport",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/cli": "^5.7.0",
+    "@capacitor/core": "^5.7.0",
+    "@zxing/library": "^0.20.0",
+    "jsqr": "^1.4.0",
+    "qrcode-generator": "^1.4.4",
+    "tesseract.js": "^5.1.1",
+    "tesseract.js-core": "^5.1.1"
+  },
+  "devDependencies": {}
+}

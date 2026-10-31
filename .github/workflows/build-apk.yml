@@ -1,0 +1,109 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - arena/**
+    paths:
+      - 'public/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare web assets
+        run: npm run prepare-web
+
+      - name: Verify required files
+        run: |
+          echo "Checking required files..."
+          test -f public/vendor/jsQR.js && echo "✓ jsQR.js"
+          test -f public/vendor/qrcode.js && echo "✓ qrcode.js"
+          test -f public/vendor/rules.js && echo "✓ rules.js"
+          test -f public/vendor/ical.js && echo "✓ ical.js"
+          test -f capacitor.config.json && echo "✓ capacitor.config.json"
+          echo "All required files present"
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Inject Android assets
+        run: node scripts/inject-android-assets.js
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          echo "Building APK..."
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "ERROR: APK not found after build"
+            exit 1
+          fi
+          echo "APK built successfully"
+          ls -lh app/build/outputs/apk/debug/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RheaSport-Physio-und-Fit-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 60
+
+      - name: Copy APK to artifacts
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/RheaSport-Physio-und-fit-debug.apk
+          echo "APK copied to artifacts/"
+          ls -lh artifacts/
+
+      - name: Commit APK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/
+          if git diff --cached --quiet; then
+            echo "APK unchanged - no commit needed"
+          else
+            git commit -m "chore: Update debug APK [skip ci]"
+            git push
+          fi

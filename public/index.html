@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RheaSport – Physio &amp; fit</title>
+<link rel="stylesheet" href="/app.css?v=2.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230b6b6b'/><path d='M30 62c8-18 14-26 20-26s8 8 20 26' stroke='white' stroke-width='9' fill='none' stroke-linecap='round'/><circle cx='50' cy='30' r='8' fill='white'/></svg>">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div><strong>RheaSport</strong><span>Physio &amp; fit</span></div>
+    </div>
+    <nav id="nav">
+      <button data-view="dashboard" class="active">◉ Übersicht</button>
+      <button data-view="scan">⌁ Verordnung / Datenabgleich <span class="badge" id="nav-abgleiche" hidden></span></button>
+      <button data-view="patienten">☺ Patienten</button>
+      <button data-view="trainer">⚑ Trainer &amp; Eigenschaften</button>
+      <button data-view="kurse">▤ Kurse &amp; Gruppen</button>
+      <button data-view="kalender">▦ Kalender <span class="badge" id="nav-signaturen" hidden></span></button>
+      <button data-view="abrechnung">€ Abrechnung</button>
+      <button data-view="dokumente">🗂 Dokumente</button>
+      <button data-view="postfach">✉ E-Mail-Journal <span class="badge" id="nav-outbox" hidden></span></button>
+      <button data-view="einstellungen">⚙ Einstellungen</button>
+    </nav>
+    <div class="side-foot">
+      <div id="side-hilfsfrist" class="hilfsfrist"></div>
+      <div class="local-note">🔒 Lokale Speicherung – Daten verlassen dieses Gerät/Server nicht (DSGVO).</div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <!-- ======================= DASHBOARD ======================= -->
+    <section id="view-dashboard" class="view">
+      <h1>Übersicht</h1>
+      <div class="stats" id="dash-stats"></div>
+      <div id="dash-warn"></div>
+      <div class="grid2">
+        <div class="card">
+          <h2>Termine heute</h2>
+          <div id="dash-heute" class="list"></div>
+        </div>
+        <div class="card">
+          <h2>Offene Datenabgleiche</h2>
+          <div id="dash-abgleiche" class="list"></div>
+        </div>
+      </div>
+      <div class="card" id="dash-sigs">
+        <h2>Unterschriften ausstehend (heute)</h2>
+        <div id="dash-signaturen" class="list"></div>
+      </div>
+    </section>
+
+    <!-- ======================= SCAN / DATENABGLEICH ======================= -->
+    <section id="view-scan" class="view" hidden>
+      <h1>Verordnung einpflegen</h1>
+
+      <!-- Startbild: Scan-Optionen -->
+      <div id="scan-start">
+        <p class="hint">Scannen Sie den <strong>PDF417-Barcode oder QR-/DataMatrix-Code der Verordnung</strong> (Muster 56, G0850 oder DGUV) – beides funktioniert – oder geben Sie den Code manuell ein. Nach dem Scan öffnet sich automatisch das <strong>Menü für den Datenabgleich</strong> – dort ergänzen Sie u.&nbsp;a. E-Mail und Telefonnummer, prüfen die Vollständigkeit und wählen den passenden Trainer/die passende Trainerin.</p>
+        <div class="scan-options">
+          <button class="big-btn" id="btn-kamera">▥ Barcode scannen<br><small>PDF417 oder QR / DataMatrix, live mit Kamera</small></button>
+          <button class="big-btn" id="btn-foto">📝 Foto auslesen (OCR)<br><small>Verordnung fotografieren – Text &amp; ICD-10 erkennen</small></button>
+          <label class="big-btn" for="qr-file">🖼 Code-Bild wählen<br><small>Screenshot/Foto mit QR- oder PDF417-Code</small></label>
+          <input type="file" id="qr-file" accept="image/*" hidden>
+          <input type="file" id="ocr-file" accept="image/*" capture="environment" hidden>
+          <button class="big-btn" id="btn-manuell">⌨ Code eingeben<br><small>oder einfügen</small></button>
+        </div>
+        <div id="scan-live" hidden>
+          <video id="scan-video" playsinline muted></video>
+          <div class="scan-hint">PDF417-Barcode (quer, Rahmen füllen) oder QR-Code ausrichten, ruhig halten… <button class="link" id="btn-kamera-stop">Kamera stoppen</button></div>
+        </div>
+        <div class="card" id="scan-manuell-box" hidden>
+          <h2>Code / Rohtext</h2>
+          <textarea id="scan-code" rows="4" placeholder='z. B. {"n":"Mustermann, Max","g":"1975-04-12","kk":"AOK Rheinland","vs":"1234…","von":"2026-11-01","bis":"2027-05-01","art":"rs","f":2,"ue":50,"icd":"M54.2","arzt":"Dr. Meier"}&#10;oder RS56|Mustermann, Max|1975-04-12|AOK|…&nbsp;oder URL mit Parametern'></textarea>
+          <div class="row">
+            <button class="btn primary" id="btn-scan-code">Code verarbeiten &amp; Datenabgleich öffnen</button>
+            <button class="btn" id="btn-scan-vollstaendig-manuell">Ohne Code – vollständig manuell erfassen</button>
+          </div>
+        </div>
+        <div class="card" id="offene-abgleiche-box">
+          <h2>Weitere offene Datenabgleiche</h2>
+          <div id="offene-abgleiche" class="list"></div>
+        </div>
+      </div>
+
+      <!-- Wizard -->
+      <div id="wizard" hidden>
+        <div class="steps" id="wizard-steps">
+          <span data-step="1" class="active">1 · Datenabgleich</span>
+          <span data-step="2">2 · Vollständigkeit</span>
+          <span data-step="3">3 · Trainer-Auswahl</span>
+          <span data-step="4">4 · Gruppe &amp; Einwilligung</span>
+        </div>
+
+        <!-- Schritt 1 -->
+        <div class="step" id="step-1">
+          <div class="grid2">
+            <div class="card">
+              <h2>Verordnungsdaten <small id="scan-format-note" class="muted"></small></h2>
+              <div class="form2">
+                <label>Name, Vorname der/des Versicherten *<input id="f-name" data-f="name" required></label>
+                <label>Geburtsdatum *<input type="date" id="f-geb" data-f="geburtsdatum"></label>
+                <label>Krankenkasse / Kostenträger *<input id="f-kk" data-f="kostentraeger" list="kk-liste"></label>
+                <datalist id="kk-liste"></datalist>
+                <label>Kostenträgerart
+                  <select id="f-kkart" data-f="kostentraegerArt">
+                    <option value="gkv">Gesetzliche Krankenversicherung</option>
+                    <option value="rv">Rentenversicherung</option>
+                    <option value="uv">Unfallversicherung (BG/DGUV)</option>
+                    <option value="sonstige">Sonstiger Träger</option>
+                  </select></label>
+                <label>Versicherten-Nr. *<input id="f-vs" data-f="versichertenNr"></label>
+                <label>IK des Kostenträgers / Arzt-IK<input id="f-ik" data-f="ik"></label>
+                <label>Verordnungsdatum (Ausstellung)<input type="date" id="f-aus" data-f="ausstellungsdatum"></label>
+                <label>Verordnungsdauer von *<input type="date" id="f-von" data-f="von"></label>
+                <label>Verordnungsdauer bis *<input type="date" id="f-bis" data-f="bis"></label>
+                <label>Art der Maßnahme *
+                  <select id="f-art" data-f="art"></select></label>
+                <label>Frequenz pro Woche *<select id="f-freq" data-f="frequenzProWoche">
+                  <option value="1">1-mal/Woche</option><option value="2">2-mal/Woche</option><option value="3">3-mal/Woche (Begründung!)</option>
+                </select></label>
+                <label>Übungseinheiten *<select id="f-uee" data-f="uebungseinheiten">
+                  <option value="50">50 ÜE (Regelwert)</option><option value="90">90 ÜE (Herzsport/Koronar)</option><option value="120">120 ÜE (schwere Beeinträchtigung)</option><option value="custom">eigene Anzahl…</option>
+                </select></label>
+                <label id="f-uee-custom-wrap" hidden>Eigene Anzahl ÜE<input type="number" id="f-uee-custom" min="1" max="200"></label>
+                <label>Formular<select id="f-formular" data-f="formular">
+                  <option value="muster56">Muster 56 (GKV, ab 01.01.2023)</option>
+                  <option value="g0850">G0850 (Rentenversicherung)</option>
+                  <option value="dguv">DGUV-Verordnung (ab 2025)</option>
+                  <option value="unbekannt">unbekannt / anderes</option>
+                </select></label>
+                <label>Ärztin/Arzt (Name, Stempel, Datum, Unterschrift) *<input id="f-arzt" data-f="arztName"></label>
+                <label class="span2">ICD-10-Diagnosen (kommagetrennt) *<input id="f-icd" data-f="icd10" placeholder="z. B. M54.2, M62.8"></label>
+                <label class="span2">Ziele / Funktions- und Belastungseinschränkungen (ICF) *<textarea id="f-ziele" data-f="ziele" rows="3"></textarea></label>
+                <label class="check span2"><input type="checkbox" id="f-folge" data-f="folgeverordnung"> Folgeverordnung (Begründung zwingend: warum noch keine selbstständige Durchführung möglich)</label>
+                <label class="span2" id="wrap-folge-beg">Begründung Folgeverordnung *<textarea id="f-folge-beg" data-f="folgeBegruendung" rows="2"></textarea></label>
+                <label class="span2 check"><input type="checkbox" id="f-ku" > Kostenübernahme der Krankenkasse liegt vor * <small>(muss vor der 1. Übungseinheit vorliegen)</small></label>
+                <label>Datum Kostenübernahme<input type="date" id="f-ku-datum" data-f="kostenuebernahme.datum"></label>
+                <label>Zeitraum der Kostenübernahme<input id="f-ku-zeitraum" data-f="kostenuebernahme.zeitraum" placeholder="z. B. 01.11.2026–30.04.2027"></label>
+                <label id="wrap-freq-beg" class="span2">Begründung Frequenz &gt; 2/Woche *<input id="f-freq-beg" data-f="frequenzBegruendung"></label>
+                <label id="wrap-uee-beg" class="span2">Begründung/Genehmigung ÜE über Richtwert *<textarea id="f-uee-beg" data-f="ueeBegruendung" rows="2"></textarea></label>
+                <label id="wrap-dauer-beg" class="span2">Begründung Dauer &gt; 6 Monate *<textarea id="f-dauer-beg" data-f="dauerBegruendung" rows="2"></textarea></label>
+              </div>
+            </div>
+            <div class="card">
+              <h2>Datenabgleich Kontakt &amp; Versicherte/r</h2>
+              <p class="hint">Ergänzen Sie im Datenabgleich zwingend <strong>E-Mail-Adresse</strong> und <strong>Telefonnummer</strong> – beides wird für Termininformationen und Rückfragen benötigt.</p>
+              <div class="form2">
+                <label>E-Mail-Adresse *<input type="email" id="f-email" data-f="email" placeholder="vorname.nachname@mail.de"></label>
+                <label>Telefonnummer *<input id="f-tel" data-f="telefon" placeholder="+49 …"></label>
+              </div>
+              <div id="abgleich-live" class="check-mini"></div>
+              <div class="row end">
+                <button class="btn primary" id="btn-zu-pruefung">Weiter zur Vollständigkeitsprüfung →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schritt 2 -->
+        <div class="step" id="step-2" hidden>
+          <div class="card">
+            <h2>Vollständigkeitsprüfung nach RSD-/BAR-Regeln</h2>
+            <p class="hint">Die Verordnung wird gegen Rahmenvereinbarung, Muster 56 (2023) und DS-GVO geprüft. <strong>Rote Punkte blockieren</strong> den Abschluss – es darf nicht mit dem Rehasport begonnen werden.</p>
+            <div id="pruef-liste" class="check-list"></div>
+            <div class="row end">
+              <button class="btn" data-goto-step="1">← zurück</button>
+              <button class="btn primary" id="btn-zu-trainer">Weiter zur Trainer-Auswahl →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schritt 3 -->
+        <div class="step" id="step-3" hidden>
+          <div class="card">
+            <h2>Passende/r Trainer/in zur Verordnung</h2>
+            <p class="hint">Auswahl anhand von <strong>Verordnungsart, Diagnose (ICD-10), Frequenz und Qualifikationen</strong> – nur BAR-/RSD-anerkannte Übungsleitungen mit gültigen Nachweisen und passender fester Gruppe sind wählbar. Auch Urlaubs-/Krankheitsvertretungen müssen die Qualifikation erfüllen.</p>
+            <div id="trainer-match" class="match-list"></div>
+            <div class="row end">
+              <button class="btn" data-goto-step="2">← zurück</button>
+              <button class="btn primary" id="btn-zu-gruppe" disabled>Weiter zur Gruppe →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schritt 4 -->
+        <div class="step" id="step-4" hidden>
+          <div class="grid2">
+            <div class="card">
+              <h2>Feste Gruppe (Kurs) zuordnen</h2>
+              <p class="hint">Rehasport findet ausschließlich in <strong>festen Gruppen</strong> statt (fester Ort, feste Zeit, feste Übungsleitung, kein Gruppenhopping). Die Gruppe muss zur verordneten Art passen.</p>
+              <div id="gruppen-liste" class="gruppe-list"></div>
+            </div>
+            <div class="card">
+              <h2>Einwilligung &amp; Anmeldung (DSGVO)</h2>
+              <p class="hint">Erhebung und Nutzung von Gesundheitsdaten (Art. 9 DSGVO) nur mit <strong>Einwilligung der/des Versicherten</strong>. Anmeldung: Datum &amp; Unterschrift möglichst direkt an der Rezeption – niemals Tipp-Ex/Datumvortrag; digitale Unterschrift mit Zeitstempel.</p>
+              <label class="check"><input type="checkbox" id="chk-einwilligung"> Einwilligungserklärung zur Verarbeitung der Gesundheitsdaten wurde ausgehändigt und erteilt (Textversion <span id="text-version"></span>)</label>
+              <label class="check"><input type="checkbox" id="chk-anmeldung"> Anmeldung/Erstgespräch erfolgt, Unterschrift der/des Versicherten wird digital geleistet</label>
+              <div class="sig-preview-box">
+                <div class="muted">Unterschrift (wird im nächsten Schritt digital erfasst):</div>
+                <div id="wiz-sig-preview" class="sig-mini">– noch keine Unterschrift –</div>
+              </div>
+              <button class="btn" id="btn-wiz-sig">✍ Unterschrift erfassen</button>
+              <div class="row end" style="margin-top:16px">
+                <button class="btn" data-goto-step="3">← zurück</button>
+                <button class="btn primary" id="btn-abschliessen">✔ Datenabgleich abschließen &amp; speichern</button>
+              </div>
+              <p class="hint">Nach dem Abschluss werden automatisch: <strong>1)&nbsp;die/der Patient/in informiert (Termine per E-Mail)</strong> und <strong>2)&nbsp;das Führungspersonal über die Vollständigkeit der Verordnung benachrichtigt</strong>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= PATIENTEN ======================= -->
+    <section id="view-patienten" class="view" hidden>
+      <h1>Patienten <button class="btn small" id="btn-neuer-patient">+ Neu anlegen</button></h1>
+      <input class="search" id="pat-suche" placeholder="Suchen nach Name, E-Mail, Telefon …">
+      <div class="row" style="margin:6px 0;flex-wrap:wrap">
+        <label class="small">Filter <select id="pat-filter">
+          <option value="">alle</option><option value="aktiv">Verordnung aktiv</option><option value="abgleich">Datenabgleich offen</option>
+          <option value="abgeschlossen">abgeschlossen</option><option value="abgerechnet">abgerechnet</option><option value="abgebrochen">abgebrochen</option>
+          <option value="keine">ohne Verordnung</option><option value="ohne-einwilligung">DSGVO-Einwilligung fehlt</option></select></label>
+        <label class="small">Gruppe <select id="pat-gruppe"><option value="">alle</option></select></label>
+        <label class="small">Sortieren <select id="pat-sort">
+          <option value="name">Name A–Z</option><option value="name-z">Name Z–A</option><option value="geb">Geburtsdatum</option>
+          <option value="ende">Verordnungsende (nächstes zuerst)</option></select></label>
+      </div>
+      <div class="table-wrap"><table id="pat-tabelle">
+        <thead><tr><th>Name</th><th>Geb.</th><th>Kontakt</th><th>Verordnung</th><th>Gruppe(n)</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>
+
+    <!-- ======================= TRAINER ======================= -->
+    <section id="view-trainer" class="view" hidden>
+      <h1>Trainer &amp; Eigenschaften <button class="btn small" id="btn-neuer-trainer">+ Trainer/in anlegen</button></h1>
+      <p class="hint">Qualifikationsnachweise nach <strong>BAR/RSD</strong> (Übungsleiter/in Rehasport, ab 01.01.2020): Herzgruppen-Nachweise sind max. <strong>2 Jahre</strong>, alle übrigen max. <strong>4 Jahre</strong> befristet. Notfallqualifikation gemäß Rahmenvereinbarung. Für Verwaltungspersonal ohne ärztliche Geheimhaltungspflicht: schriftliche <strong>Verschwiegenheitserklärung</strong> (§ 203 StGB/Art. 9 DSGVO).</p>
+      <div id="trainer-karten" class="karten"></div>
+    </section>
+
+    <!-- ======================= KURSE ======================= -->
+    <section id="view-kurse" class="view" hidden>
+      <h1>Kurse &amp; feste Gruppen <button class="btn small" id="btn-neuer-kurs">+ Kurs eintragen</button></h1>
+      <div id="kurs-liste" class="karten"></div>
+    </section>
+
+    <!-- ======================= KALENDER ======================= -->
+    <section id="view-kalender" class="view" hidden>
+      <h1>Geteilter Terminkalender</h1>
+      <div class="card share-box">
+        <div class="row between">
+          <div>
+            <strong>Kalender teilen:</strong> <span id="share-url" class="mono selectable"></span>
+            <div class="muted small" id="share-hinweis"></div>
+          </div>
+          <div class="row">
+            <button class="btn small" id="btn-share-copy">🔗 Link kopieren</button>
+            <button class="btn small" id="btn-share-rotate">↻ Link erneuern</button>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="chk-share"> Kalender-Feed aktiv (Abonnierbar in Google/Apple/Outlook-Kalender)</label>
+      </div>
+      <div class="row between kalender-kopf">
+        <div class="row">
+          <button class="btn small" id="cal-prev">‹</button>
+          <strong id="cal-label"></strong>
+          <button class="btn small" id="cal-next">›</button>
+        </div>
+        <div class="row">
+          <span class="dot dot-geplant"></span> geplant <span class="dot dot-stattgefunden"></span> stattgefunden <span class="dot dot-ausgefallen"></span> ausgefallen <span class="dot dot-verschoben"></span> verschoben
+        </div>
+      </div>
+      <div id="kalender-grid" class="kalender-grid"></div>
+      <div class="card" id="cal-day-box" hidden>
+        <h2 id="cal-day-title"></h2>
+        <div id="cal-day-list"></div>
+      </div>
+    </section>
+
+    <!-- ======================= ABRECHNUNG ======================= -->
+    <section id="view-abrechnung" class="view" hidden>
+      <h1>Abrechnung</h1>
+      <div class="card info-card">
+        <strong>Abrechnungssätze:</strong> Die Vergütungssätze der Kostenträger finden Sie hier:
+        <a href="https://verguetungssaetze.rehasport-deutschland.de/" target="_blank" rel="noopener">https://verguetungssaetze.rehasport-deutschland.de/</a>
+        <span class="muted">(RSD – Vergütungssätze, gültig 01.01.–31.12.2026)</span><br>
+        <span class="hint">Es werden <strong>nur tatsächlich erbrachte</strong> Übungseinheiten mit ärztlicher Verordnung und vorliegender Kostenübernahme abgerechnet (Vorab-Unterschriften unzulässig). Gegenüber gesetzlich Versicherten werden keine Eigenbeteiligungen erhoben (Sachleistungsprinzip, § 2 SGB V).</span>
+      </div>
+      <div id="abr-stat"></div>
+      <div id="abr-summen"></div>
+      <div class="row between" style="margin:6px 0;flex-wrap:wrap">
+        <div class="row" style="flex-wrap:wrap">
+          <label class="small">Status <select id="abr-filter">
+            <option value="">alle</option><option value="bereit">bereit zur Abrechnung</option><option value="offen">Offene Posten</option><option value="laeuft">läuft noch</option>
+            <option value="abgerechnet">abgerechnet</option><option value="bezahlt">bezahlt</option><option value="abgebrochen">abgebrochen</option></select></label>
+          <label class="small">Kostenträgerart <select id="abr-filter-kt">
+            <option value="">alle</option><option value="gkv">GKV</option><option value="rv">Rentenversicherung</option>
+            <option value="uv">Unfallversicherung</option><option value="sonstige">Sonstige</option></select></label>
+          <label class="small">Bezahlt <select id="abr-filter-bezahlt">
+            <option value="">alle</option><option value="nein">noch offen</option><option value="ja">bezahlt</option></select></label>
+          <label class="small">Sortieren <select id="abr-sort">
+            <option value="name">Patient A–Z</option><option value="betrag">Betrag (hoch zuerst)</option>
+            <option value="status">Status</option><option value="ende">Verordnungsende</option></select></label>
+        </div>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn" id="btn-csv">⬇ CSV exportieren</button>
+          <button class="btn" id="btn-csv-gmail">✉ CSV per Gmail</button>
+          <button class="btn" id="btn-abr-mail">✉ Per Gmail/E-Mail senden</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="abr-tabelle">
+        <thead><tr><th>Patient/in</th><th>Trainer/in</th><th>Kostenträger</th><th>Art</th><th>Verordnung</th><th>ÜE erbracht</th><th>Satz €/ÜE</th><th>Betrag</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>
+
+    <!-- ======================= DOKUMENTE ======================= -->
+    <section id="view-dokumente" class="view" hidden>
+      <h1>Dokumente</h1>
+      <div class="ptabs">
+        <button class="ptab active" data-dt="scans">Scans je Patient</button>
+        <button class="ptab" data-dt="doku">Trainingsdokumentation</button>
+        <button class="ptab" data-dt="tl">Teilnehmerlisten</button>
+        <button class="ptab" data-dt="vorl">Vorlagen</button>
+      </div>
+      <div id="dok-body"></div>
+    </section>
+
+    <!-- ======================= POSTFACH ======================= -->
+    <section id="view-postfach" class="view" hidden>
+      <h1>E-Mail-Journal</h1>
+      <div id="smtp-hinweis" class="card info-card"></div>
+      <div class="table-wrap"><table id="outbox-tabelle">
+        <thead><tr><th>Zeitpunkt</th><th>Art</th><th>Empfänger</th><th>Betreff</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>
+
+    <!-- ======================= EINSTELLUNGEN ======================= -->
+    <section id="view-einstellungen" class="view" hidden>
+      <h1>Einstellungen</h1>
+      <div class="grid2">
+        <div class="card">
+          <h2>Leistungserbringer (für Abrechnung)</h2>
+          <div class="form2" id="cfg-anbieter">
+            <label class="span2">Name<input data-a="name"></label>
+            <label>Straße/Nr.<input data-a="strasse"></label>
+            <label>PLZ<input data-a="plz"></label>
+            <label>Ort<input data-a="ort"></label>
+            <label>Telefon<input data-a="telefon"></label>
+            <label class="span2">E-Mail<input data-a="email" type="email"></label>
+            <label>Institutionskennzeichen (IK)<input data-a="ik"></label>
+            <label>Betriebsstätte-Nr.<input data-a="betriebsstaette"></label>
+            <label class="span2">Träger / RehaSport-Landesverband<input data-a="traeger"></label>
+            <label class="span2">IBAN<input data-a="iban"></label>
+            <label>Kontoinhaber<input data-a="kontoinhaber"></label>
+            <label>Bank<input data-a="bank"></label>
+          </div>
+          <div class="row end"><button class="btn primary" id="btn-save-anbieter">Speichern</button></div>
+        </div>
+        <div class="card">
+          <h2>Bundesland &amp; Notfallfristen</h2>
+          <label>Bundesland<select id="cfg-bundesland"></select></label>
+          <label class="check"><input type="checkbox" id="cfg-laendlich"> Einsatz in ländlichem Gebiet</label>
+          <div id="cfg-hilfsfrist" class="hint-box"></div>
+          <p class="hint">Die Hilfsfrist gilt als Orientierung für die Notfallabsicherung („unverzüglich“ i.&nbsp;S.&nbsp;d. Rahmenvereinbarung).</p>
+
+          <h2>Führungspersonal (Empfänger der Vollständigkeits-Bestätigung)</h2>
+          <div id="cfg-fuehrung"></div>
+          <button class="btn small" id="btn-fuehrung-plus">+ Empfänger</button>
+          <div class="row end" style="margin-top:10px"><button class="btn primary" id="btn-save-ort">Speichern</button></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>E-Mail-Versand (SMTP)</h2>
+          <p class="hint" id="smtp-hint-text">Ohne SMTP-Konfiguration werden alle Nachrichten im Journal vorgehalten und können als Entwurf (mailto:) geöffnet werden. Beispiel GMX: <code>mail.gmx.net</code> (Port 587, TLS).</p>
+          <div class="form2" id="cfg-smtp">
+            <label>SMTP-Host<input data-s="host" placeholder="mail.example.de"></label>
+            <label>Port<input data-s="port" type="number"></label>
+            <label class="check"><input type="checkbox" data-s="secure"> SSL/TLS (Port 465)</label>
+            <label>Benutzer<input data-s="user"></label>
+            <label>Passwort<input data-s="pass" type="password" placeholder="••••••"></label>
+            <label class="span2">Absender (von)<input data-s="from" placeholder="rheasport@praxis.de"></label>
+          </div>
+          <div class="row">
+            <button class="btn small" id="btn-save-smtp">SMTP speichern</button>
+            <button class="btn small" id="btn-testmail">Test-E-Mail senden</button>
+            <span id="smtp-status" class="muted"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Datenschutz (DSGVO)</h2>
+          <div class="form2" id="cfg-ds">
+            <label>Datenschutzbeauftragter (Name)<input data-d="dsbName"></label>
+            <label>E-Mail<input data-d="dsbEmail" type="email"></label>
+            <label class="span2">Version/Datum Einwilligungstext<input data-d="textVersion"></label>
+          </div>
+          <p class="hint">Empfohlene Maßnahmen (RSD): DSB benennen, Datenschutzhandbuch, Schulung/Verpflichtung der Mitarbeiter, Einwilligungserklärungen einholen, Prozesse für Betroffenenrechte und Meldung von Datenschutzpannen.</p>
+
+          <h2>Geteilter Kalender</h2>
+          <label>Titel<input id="cfg-kal-titel"></label>
+
+          <h2>Gmail / Google</h2>
+          <p class="hint">Die Google-Anmeldung (Mailversand und Kalender) richtest du oben unter <strong>Google (Gmail &amp; Kalender)</strong> ein. Ohne Anmeldung gehen Mails und Kalender weiter über das Teilen-Menü an die Gmail-App bzw. Google Kalender.</p>
+          <div class="form2">
+            <label>Eigene Gmail-Adresse (Information)<input type="email" id="cfg-gmail" placeholder="name@gmail.com"></label>
+            <label>Empfänger für Abrechnungen (E-Mail)<input type="email" id="cfg-abr-mail" placeholder="buchhaltung@…"></label>
+          </div>
+
+          <h2>Gruppennamen (Auswahlliste)</h2>
+          <p class="hint">Ein Name pro Zeile – erscheint beim Anlegen eines Kurses als Auswahl. Eigene Namen können dort trotzdem frei eingetragen werden.</p>
+          <textarea id="cfg-gruppen" rows="6"></textarea>
+
+          <h2>Unterschriften &amp; Abrechnung</h2>
+          <label>Unterschrift frühestens … Minuten vor Kursbeginn (0 = erst nach der Einheit)<input type="number" id="cfg-vorab" min="0" max="60"></label>
+          <label class="check"><input type="checkbox" id="cfg-autoabr"> Abrechnung automatisch erstellen, wenn eine Verordnung abgebrochen oder vollständig erbracht ist (Entwurf mit Rechnungsnummer)</label>
+
+          <h2>Rechnungsvorlagen (Kostenstellen)</h2>
+          <p class="hint">Textbausteine für Rechnungen je Kostenträgerart. Werden automatisch in die Rechnung eingefügt.</p>
+          <div class="form2" id="cfg-vorlagen">
+            <label class="span2">GKV (Gesetzliche Krankenversicherung)<textarea id="cfg-vorlage-gkv" rows="2"></textarea></label>
+            <label class="span2">Rentenversicherung<textarea id="cfg-vorlage-rv" rows="2"></textarea></label>
+            <label class="span2">Unfallversicherung (DGUV)<textarea id="cfg-vorlage-uv" rows="2"></textarea></label>
+            <label class="span2">Sonstige Träger<textarea id="cfg-vorlage-sonstige" rows="2"></textarea></label>
+          </div>
+
+          <h2>Vergütungssätze (Vorgaben)</h2>
+          <p class="hint">Sätze je Kostenträgerart &amp; Maßnahme hinterlegen (Quelle: <a href="https://verguetungssaetze.rehasport-deutschland.de/" target="_blank" rel="noopener">RSD-Vergütungssätze</a>). Optional – pro Verordnung überschreibbar.</p>
+          <div id="cfg-satz"></div>
+          <button class="btn small" id="btn-satz-plus">+ Satz hinterlegen</button>
+          <div class="row end" style="margin-top:10px"><button class="btn primary" id="btn-save-ds">Speichern</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Google (Gmail &amp; Kalender)</h2>
+        <div id="cfg-google"><div class="muted">Wird geladen …</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Speicherort &amp; Backups</h2>
+        <div id="cfg-backup"><div class="muted">Wird geladen …</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Scan-Kontrolle &amp; Prüfprotokoll</h2>
+        <p class="hint">Hier können alle gescannten Verordnungen und deren Prüfpunkte eingesehen werden – jeder Mitarbeiter kann den Scan kontrollieren.</p>
+        <div class="row" style="margin-bottom:10px">
+          <label class="small">Status <select id="scan-ctrl-filter">
+            <option value="">alle</option><option value="abgleich">Datenabgleich offen</option><option value="aktiv">aktiv</option>
+            <option value="abgeschlossen">abgeschlossen</option><option value="abgebrochen">abgebrochen</option></select></label>
+          <button class="btn small" id="btn-scan-ctrl-refresh">↻ Aktualisieren</button>
+        </div>
+        <div id="scan-ctrl-liste" class="list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Daten (lokal)</h2>
+        <p class="hint">Der gesamte Datenbestand liegt lokal unter <code>data/db.json</code>. Exportieren Sie regelmäßig ein Backup.</p>
+        <div class="row">
+          <a class="btn" id="btn-export" href="/api/export" download>⬇ Backup exportieren</a>
+          <label class="btn" for="import-file">⬆ Backup importieren</label>
+          <input type="file" id="import-file" accept="application/json" hidden>
+          <button class="btn danger" id="btn-demo-reset">Demo-/Stammdaten löschen</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Modal & Signature -->
+<div id="modal-root" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><h3 id="modal-title"></h3><button class="icon-btn" id="modal-close">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="/vendor/jsQR.js"></script>
+<script src="/vendor/qrcode.js"></script>
+<script src="/vendor/rules.js"></script>
+<script src="/vendor/ical.js"></script>
+<script src="/vendor/ocr-parser.js"></script>
+<script src="/store.js"></script>
+<script src="/google.js"></script>
+<script src="/local-api.js?v=2.0"></script>
+<script src="/app.js?v=2.0"></script>
+</body>
+</html>

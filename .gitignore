@@ -6,3 +6,4 @@ data/
 .DS_Store
 .env
 .mimic-venv/
+.mimic-state/

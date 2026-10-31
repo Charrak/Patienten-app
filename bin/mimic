@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Launcher for mimic (https://github.com/littledivy/mimic).
+# Uses the isolated virtualenv in .mimic-venv, so `mimic` also finds
+# mitmweb (the capture backend) without activating anything by hand.
+set -e
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+[ -x "$ROOT/.mimic-venv/bin/mimic" ] || {
+  echo "mimic ist nicht installiert — bitte zuerst: sh scripts/install-mimic.sh" >&2
+  exit 1
+}
+PATH="$ROOT/.mimic-venv/bin:$PATH"
+export PATH
+exec "$ROOT/.mimic-venv/bin/mimic" "$@"

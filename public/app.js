@@ -1589,23 +1589,107 @@ async function renderKalender() {
     $('#chk-share').checked = share.geteilt;
   }
 
-  const jahr = calMon.getFullYear(), mon = calMon.getMonth();
-  $('#cal-label').textContent = calMon.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  kalTrainerListe();
+  $('#kal-ansicht').value = KAL_ANSICHT;
+  $('#cal-label').textContent = kalLabel();
+  renderKalenderLinks();
+  if (KAL_ANSICHT === 'monat') {
+    $('#kal-tagbox').hidden = true;
+    $('#kal-monat-wrap').hidden = false;
+    await renderKalenderMonat();
+  } else {
+    $('#kal-monat-wrap').hidden = true;
+    $('#kal-tagbox').hidden = false;
+    await renderKalenderPlan();
+  }
+  renderWarteliste();
+}
 
-  const von = new Date(jahr, mon, 1).toISOString().slice(0, 10);
+/* ---- Tages-/Wochenplan (Spalten wie in der Vorlage) ---- */
+const KAL_START = 8, KAL_ENDE = 21, KAL_H = 44;
+let KAL_DATUM = heutigesISO();
+let KAL_ANSICHT = 'tag';
+let KAL_TRAINER = null; // Set gewählter Trainer-IDs (null = Standard: alle aktiven)
+
+const isoVon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const zeitAdd = (hhmm, min) => { const [h, m] = String(hhmm || '0:0').split(':').map(Number); const t = (h || 0) * 60 + (m || 0) + (min || 0); return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+function kwNr(iso) {
+  const d = new Date(`${iso}T12:00:00`);
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - dn + 3);
+  const first = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const fw = (first.getUTCDay() + 6) % 7; first.setUTCDate(first.getUTCDate() - fw + 3);
+  return 1 + Math.round((t - first) / 604800000);
+}
+function wocheVon(iso) { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoVon(d); }
+function kalTrainerListe() {
+  const alle = (S.trainer || []).filter((t) => t.aktiv !== false);
+  if (KAL_TRAINER === null) KAL_TRAINER = new Set(alle.map((t) => t.id));
+  return alle;
+}
+function kalLabel() {
+  const d = new Date(`${KAL_DATUM}T12:00:00`);
+  if (KAL_ANSICHT === 'tag') return `${d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })} | KW ${kwNr(KAL_DATUM)} | ${d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+  if (KAL_ANSICHT === 'woche') {
+    const v = new Date(`${wocheVon(KAL_DATUM)}T12:00:00`); const e = new Date(v); e.setDate(e.getDate() + 6);
+    return `KW ${kwNr(KAL_DATUM)} · ${v.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} – ${e.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+  }
+  return d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+}
+const kursZu = (t) => (S.kurse || []).find((k) => k.id === t.kursId) || {};
+function kalSichtbar(t) { const k = kursZu(t); return !k.trainerId || KAL_TRAINER.has(k.trainerId); }
+function evHtml(t) {
+  const [h, m] = String(t.beginn || '0:0').split(':').map(Number);
+  const top = Math.max(0, (((h || 0) * 60 + (m || 0)) - KAL_START * 60) / 60 * KAL_H);
+  const hgt = Math.max(22, (t.dauerMin || 45) / 60 * KAL_H - 2);
+  const tn = (t.anwesenheit || []).filter((a) => a.wahrgenommen).length;
+  const titel = (t.kurs && t.kurs.titel) || 'Termin';
+  return `<div class="kp-ev ${t.status}" data-id="${t.id}" style="top:${top}px;height:${hgt}px" title="${esc(titel)} · ${esc(t.status)}">
+    ${esc(t.beginn)}–${zeitAdd(t.beginn, t.dauerMin || 45)}<div class="t">${esc(titel)}</div>${tn ? `<div>${tn} TN</div>` : ''}</div>`;
+}
+async function renderKalenderPlan() {
+  const woche = KAL_ANSICHT === 'woche';
+  const von = woche ? wocheVon(KAL_DATUM) : KAL_DATUM;
+  const eb = new Date(`${von}T12:00:00`); if (woche) eb.setDate(eb.getDate() + 6);
+  const liste = await ladeTermine(von, isoVon(eb));
+  const cols = [];
+  if (woche) {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(`${von}T12:00:00`); d.setDate(d.getDate() + i); const iso = isoVon(d);
+      cols.push({ tag: iso, kopf: `<strong>${WOCHENTAGE[d.getDay()]}</strong><span class="muted">${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.</span>`, termine: liste.filter((t) => t.datum === iso && kalSichtbar(t)) });
+    }
+  } else {
+    for (const tr of (S.trainer || []).filter((t) => KAL_TRAINER.has(t.id))) {
+      cols.push({ kopf: `<strong>${esc(tr.vorname)} ${esc(tr.nachname)}</strong>`, termine: liste.filter((t) => t.datum === KAL_DATUM && kursZu(t).trainerId === tr.id) });
+    }
+    const rest = liste.filter((t) => t.datum === KAL_DATUM && !kursZu(t).trainerId);
+    if (rest.length) cols.push({ kopf: '<strong>Weitere</strong>', termine: rest });
+  }
+  const bodyH = (KAL_ENDE - KAL_START) * KAL_H;
+  const grid = `56px repeat(${Math.max(1, cols.length)}, minmax(${woche ? 92 : 128}px,1fr))`;
+  const hours = []; for (let h = KAL_START; h <= KAL_ENDE; h++) hours.push(h);
+  const head = `<div class="kp-head" style="grid-template-columns:${grid}"><div class="hcell" style="border-left:0"></div>${cols.map((c) => `<div class="hcell"${c.tag ? ` data-tag="${c.tag}" style="cursor:pointer" title="Tagesplan öffnen"` : ''}>${c.kopf}</div>`).join('')}</div>`;
+  const times = `<div class="kp-times" style="height:${bodyH}px">${hours.map((h) => `<span style="top:${(h - KAL_START) * KAL_H}px">${String(h).padStart(2, '0')}:00</span>`).join('')}</div>`;
+  const colHtml = cols.map((c) => `<div class="kp-col" style="height:${bodyH}px">${c.termine.map(evHtml).join('')}</div>`).join('');
+  $('#kal-tagbox').innerHTML = liste.length
+    ? `${head}<div class="kp-body" style="grid-template-columns:${grid}">${times}${colHtml}</div>`
+    : '<div class="kal-leer">Keine Termine im Zeitraum – über „+ Termine planen“ (Kurse &amp; Gruppen) anlegen.</div>';
+  $$('#kal-tagbox .kp-ev').forEach((el) => { el.onclick = () => oeffneTermin(el.dataset.id); });
+  $$('#kal-tagbox .hcell[data-tag]').forEach((el) => { el.onclick = () => { KAL_DATUM = el.dataset.tag; KAL_ANSICHT = 'tag'; renderKalender(); }; });
+}
+async function renderKalenderMonat() {
+  const d0 = new Date(`${KAL_DATUM}T12:00:00`);
+  const jahr = d0.getFullYear(), mon = d0.getMonth();
+  const von = new Date(jahr, mon, 1);
   const letzte = new Date(jahr, mon + 1, 0);
-  const bis = letzte.toISOString().slice(0, 10);
-  calTermine = await ladeTermine(von, bis);
-
-  const erstes = new Date(jahr, mon, 1);
-  const startOffset = erstes.getDay(); // So=0
+  calTermine = await ladeTermine(isoVon(von), isoVon(letzte));
   const grid = $('#kalender-grid');
   let html = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<div class="wd">${w}</div>`).join('');
   const cells = [];
-  const startMontag = new Date(erstes); startMontag.setDate(1 - startOffset);
+  const startMontag = new Date(von); startMontag.setDate(1 - ((von.getDay() + 6) % 7));
   for (let i = 0; i < 42; i++) {
     const d = new Date(startMontag); d.setDate(startMontag.getDate() + i);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const iso = isoVon(d);
     const evs = calTermine.filter((t) => t.datum === iso);
     cells.push(`<div class="day ${d.getMonth() !== mon ? 'other' : ''} ${iso === heutigesISO() ? 'today' : ''}" data-d="${iso}">
       <div class="dnum">${d.getDate()}</div>
@@ -1614,8 +1698,92 @@ async function renderKalender() {
     if (i >= 34 && d.getMonth() !== mon && i % 7 === 6) break;
   }
   grid.innerHTML = html + cells.join('');
-  $$('#kalender-grid .day').forEach((el) => { el.onclick = () => zeigeTag(el.dataset.d); });
+  $$('#kalender-grid .day').forEach((el) => { el.onclick = () => { KAL_DATUM = el.dataset.d; zeigeTag(el.dataset.d); }; });
 }
+function renderKalenderLinks() {
+  /* Mini-Monatskalender links */
+  const d = new Date(`${KAL_DATUM}T12:00:00`);
+  const erstes = new Date(d.getFullYear(), d.getMonth(), 1);
+  const start = new Date(erstes); start.setDate(1 - ((erstes.getDay() + 6) % 7));
+  let rows = '';
+  for (let i = 0; i < 42; i++) {
+    const cur = new Date(start); cur.setDate(start.getDate() + i);
+    if (i % 7 === 0) rows += `<tr><td class="kw">${kwNr(isoVon(cur))}</td>`;
+    const cls = [isoVon(cur) === heutigesISO() ? 'heute' : '', isoVon(cur) === KAL_DATUM ? 'gew' : '', cur.getMonth() !== d.getMonth() ? 'and' : ''].join(' ');
+    rows += `<td><button class="${cls}" data-d="${isoVon(cur)}">${cur.getDate()}</button></td>`;
+    if (i % 7 === 6) rows += '</tr>';
+    if (i >= 34 && cur.getMonth() !== d.getMonth() && i % 7 === 6) break;
+  }
+  $('#kal-mini').innerHTML = `<div class="mhead"><span>${d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</span>
+    <span class="row" style="gap:2px"><button class="icon-btn" id="km-prev" title="Monat zurück">‹</button><button class="icon-btn" id="km-next" title="Monat vor">›</button></span></div>
+    <table><tr><th>KW</th>${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<th>${w}</th>`).join('')}</tr>${rows}</table>`;
+  $$('#kal-mini button[data-d]').forEach((b) => { b.onclick = () => { KAL_DATUM = b.dataset.d; renderKalender(); }; });
+  $('#km-prev').onclick = () => { const x = new Date(`${KAL_DATUM}T12:00:00`); x.setMonth(x.getMonth() - 1); KAL_DATUM = isoVon(x); renderKalender(); };
+  $('#km-next').onclick = () => { const x = new Date(`${KAL_DATUM}T12:00:00`); x.setMonth(x.getMonth() + 1); KAL_DATUM = isoVon(x); renderKalender(); };
+  /* Mitarbeiter-Filter */
+  const alle = kalTrainerListe();
+  $('#kal-mitarb-liste').innerHTML = alle.map((t) => `<label class="check"><input type="checkbox" data-tid="${t.id}" ${KAL_TRAINER.has(t.id) ? 'checked' : ''}> ${esc(t.vorname)} ${esc(t.nachname)}</label>`).join('')
+    || '<div class="muted small">Keine Trainer/innen angelegt.</div>';
+  $$('#kal-mitarb-liste input').forEach((c) => {
+    c.onchange = () => { if (c.checked) KAL_TRAINER.add(c.dataset.tid); else KAL_TRAINER.delete(c.dataset.tid); renderKalender(); };
+  });
+  $('#kal-alle').checked = alle.length > 0 && KAL_TRAINER.size === alle.length;
+  $('#kal-alle').onchange = (e) => {
+    KAL_TRAINER = e.target.checked ? new Set(alle.map((t) => t.id)) : new Set();
+    renderKalender();
+  };
+}
+function kalShift(dir) {
+  const d = new Date(`${KAL_DATUM}T12:00:00`);
+  if (KAL_ANSICHT === 'tag') d.setDate(d.getDate() + dir);
+  else if (KAL_ANSICHT === 'woche') d.setDate(d.getDate() + 7 * dir);
+  else d.setMonth(d.getMonth() + dir);
+  KAL_DATUM = isoVon(d);
+  renderKalender();
+}
+window.kalTagOeffnen = (iso) => { KAL_DATUM = iso; KAL_ANSICHT = 'tag'; renderKalender(); };
+
+/* ---- Warteliste (lokale Ablage) ---- */
+const WL_KEY = 'rhea-warteliste';
+const ladeWl = () => { try { return JSON.parse(localStorage.getItem(WL_KEY)) || []; } catch (_) { return []; } };
+const speichereWl = (l) => localStorage.setItem(WL_KEY, JSON.stringify(l));
+function renderWarteliste() {
+  const q = (($('#wl-suche') || {}).value || '').trim().toLowerCase();
+  let l = ladeWl().sort((a, b) => String(b.erstellt).localeCompare(String(a.erstellt)));
+  if (q) l = l.filter((e) => `${e.name} ${e.telefon || ''} ${e.notiz || ''}`.toLowerCase().includes(q));
+  $('#wl-count').textContent = String(ladeWl().length);
+  $('#wl-liste').innerHTML = l.map((e) => `<div class="wl-item">
+    <div class="row between"><span class="nm">${esc(e.name)}</span><button class="icon-btn" title="Entfernen" onclick="wlLoeschen('${e.id}')">🗑</button></div>
+    ${e.telefon ? `<div>☎ ${esc(e.telefon)}</div>` : ''}
+    ${e.notiz ? `<div class="muted">${esc(e.notiz)}</div>` : ''}
+    <div class="muted small">Erstellt: ${fmt(e.erstellt)}</div>
+  </div>`).join('') || '<div class="muted small">Keine Einträge auf der Warteliste.</div>';
+}
+window.wlLoeschen = (id) => {
+  if (!confirm('Eintrag von der Warteliste entfernen?')) return;
+  speichereWl(ladeWl().filter((e) => e.id !== id));
+  renderWarteliste(); toast('Eintrag entfernt.', 'ok');
+};
+$('#btn-wl-add').onclick = () => {
+  openModal('Warteliste – Patient/in hinzufügen', `
+    <div class="form2">
+      <label class="span2">Name, Vorname<input id="wl-name"></label>
+      <label>Telefon<input id="wl-tel"></label>
+      <label>Erstellt am<input type="date" id="wl-dat" value="${heutigesISO()}"></label>
+      <label class="span2">Notiz (z. B. „KW44 MLD 60 – KG“)<input id="wl-notiz"></label>
+    </div>`, [
+    { label: 'Abbrechen', onClick: closeModal },
+    { label: '💾 Speichern', cls: 'btn primary', onClick: () => {
+      const name = $('#wl-name').value.trim();
+      if (!name) { toast('Bitte Namen angeben.', 'err'); return; }
+      const l = ladeWl();
+      l.push({ id: `wl_${Date.now().toString(36)}`, name, telefon: $('#wl-tel').value.trim(), notiz: $('#wl-notiz').value.trim(), erstellt: $('#wl-dat').value || heutigesISO() });
+      speichereWl(l); closeModal(); renderWarteliste(); toast('Zur Warteliste hinzugefügt.', 'ok');
+    } },
+  ]);
+};
+$('#wl-suche').addEventListener('input', renderWarteliste);
+$('#btn-termine-planen').onclick = () => { toast('Termine entstehen aus den Wochenplänen der Kurse – bitte dort anlegen/öffnen.', 'ok'); zeigeView('kurse'); };
 
 async function teileIcsDatei() {
   try {
@@ -1628,8 +1796,10 @@ async function teileIcsDatei() {
 }
 window.teileIcsDatei = teileIcsDatei;
 
-$('#cal-prev').onclick = () => { calMon.setMonth(calMon.getMonth() - 1); renderKalender(); };
-$('#cal-next').onclick = () => { calMon.setMonth(calMon.getMonth() + 1); renderKalender(); };
+$('#cal-prev').onclick = () => kalShift(-1);
+$('#cal-next').onclick = () => kalShift(1);
+$('#cal-heute').onclick = () => { KAL_DATUM = heutigesISO(); renderKalender(); };
+$('#kal-ansicht').onchange = (e) => { KAL_ANSICHT = e.target.value; renderKalender(); };
 $('#chk-share').onchange = async () => { await api('PUT', '/api/settings', { kalender: { geteilt: $('#chk-share').checked } }); await reload(false); };
 $('#btn-share-copy').onclick = async () => {
   try { await navigator.clipboard.writeText($('#share-url').textContent); toast('Kalender-Link kopiert.', 'ok'); }
@@ -1643,7 +1813,7 @@ $('#btn-share-rotate').onclick = async () => {
 function zeigeTag(iso) {
   const tag = termineCache.filter((t) => t.datum === iso);
   $('#cal-day-box').hidden = false;
-  $('#cal-day-title').textContent = new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  $('#cal-day-title').innerHTML = `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })} <button class="btn small" onclick="kalTagOeffnen('${iso}')">Im Tagesplan öffnen</button>`;
   $('#cal-day-list').innerHTML = tag.length ? tag.map((t) => `
     <div class="tn-row">
       <div class="nm"><strong>${esc(t.beginn)} Uhr</strong> · ${esc(t.kurs.titel)}</div>

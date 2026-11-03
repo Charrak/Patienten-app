@@ -275,7 +275,7 @@
 
     <!-- ======================= KALENDER ======================= -->
     <section id="view-kalender" class="view" hidden>
-      <h1>Geteilter Terminkalender</h1>
+      <h1>Termine</h1>
       <div class="card share-box">
         <div class="row between">
           <div>
@@ -289,20 +289,47 @@
         </div>
         <label class="check"><input type="checkbox" id="chk-share"> Kalender-Feed aktiv (Abonnierbar in Google/Apple/Outlook-Kalender)</label>
       </div>
-      <div class="row between kalender-kopf">
+      <div class="kal-toolbar">
         <div class="row">
-          <button class="btn small" id="cal-prev">‹</button>
+          <button class="btn small" id="cal-prev" title="zurück">‹</button>
+          <button class="btn small" id="cal-heute">Heute</button>
+          <button class="btn small" id="cal-next" title="vor">›</button>
           <strong id="cal-label"></strong>
-          <button class="btn small" id="cal-next">›</button>
         </div>
         <div class="row">
-          <span class="dot dot-geplant"></span> geplant <span class="dot dot-stattgefunden"></span> stattgefunden <span class="dot dot-ausgefallen"></span> ausgefallen <span class="dot dot-verschoben"></span> verschoben
+          <label class="small">Ansicht <select id="kal-ansicht">
+            <option value="tag">Tag</option><option value="woche">Woche</option><option value="monat">Monat</option>
+          </select></label>
+          <span class="dot dot-geplant"></span> geplant <span class="dot dot-stattgefunden"></span> stattgefunden
+          <span class="dot dot-ausgefallen"></span> ausgefallen <span class="dot dot-verschoben"></span> verschoben
         </div>
       </div>
-      <div id="kalender-grid" class="kalender-grid"></div>
-      <div class="card" id="cal-day-box" hidden>
-        <h2 id="cal-day-title"></h2>
-        <div id="cal-day-list"></div>
+      <div class="kal-layout">
+        <aside class="kal-left">
+          <div id="kal-mini" class="card kal-mini"></div>
+          <button class="btn primary" id="btn-termine-planen" style="width:100%">+ Termine planen</button>
+          <div class="card kal-mitarb">
+            <strong style="font-size:13.5px">Mitarbeiter anzeigen</strong>
+            <label class="check"><input type="checkbox" id="kal-alle"> Alle anzeigen</label>
+            <div id="kal-mitarb-liste"></div>
+          </div>
+        </aside>
+        <div class="kal-main">
+          <div id="kal-tagbox" class="kal-plan"></div>
+          <div id="kal-monat-wrap" hidden>
+            <div id="kalender-grid" class="kalender-grid"></div>
+            <div class="card" id="cal-day-box" hidden>
+              <h2 id="cal-day-title"></h2>
+              <div id="cal-day-list"></div>
+            </div>
+          </div>
+        </div>
+        <aside class="card kal-right">
+          <div class="row between"><strong style="font-size:14px">Warteliste</strong><span class="chip gray" id="wl-count">0</span></div>
+          <button class="btn primary small" id="btn-wl-add" style="width:100%">+ Patient hinzufügen</button>
+          <input class="search" id="wl-suche" style="margin:0" placeholder="Suchen…">
+          <div id="wl-liste" class="wl-liste"></div>
+        </aside>
       </div>
     </section>
 

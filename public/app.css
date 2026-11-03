@@ -192,6 +192,45 @@ td .row{gap:6px}
 /* ---------- Kalender ---------- */
 .share-box{padding:14px 18px}
 .kalender-kopf{margin:6px 2px 10px}
+.kal-toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin:4px 2px 12px}
+.kal-layout{display:grid;grid-template-columns:232px minmax(0,1fr) 252px;gap:14px;align-items:start}
+@media(max-width:1250px){.kal-layout{grid-template-columns:210px minmax(0,1fr)}.kal-right{grid-column:1/-1}}
+@media(max-width:900px){.kal-layout{grid-template-columns:1fr}}
+.kal-left,.kal-right{display:flex;flex-direction:column;gap:10px;margin:0}
+.kal-mini{padding:10px 12px}
+.kal-mini table{width:100%;border-collapse:collapse;font-size:11.5px}
+.kal-mini th{background:none;padding:2px 0;color:var(--muted);font-size:10px;text-transform:uppercase;position:static}
+.kal-mini td{padding:0;border:0;text-align:center}
+.kal-mini td button{width:100%;border:0;background:none;border-radius:7px;padding:3px 0;font-size:11.5px;color:var(--ink);cursor:pointer}
+.kal-mini td button:hover{background:var(--teal-l)}
+.kal-mini td button.heute{box-shadow:inset 0 0 0 1.5px var(--teal);font-weight:700}
+.kal-mini td button.gew{background:var(--teal);color:#fff;font-weight:700}
+.kal-mini td button.and{color:var(--muted)}
+.kal-mini .kw{color:var(--muted);font-size:10px}
+.kal-mini .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:700;font-size:12.5px}
+.kal-mitarb{padding:10px 12px}
+.kal-mitarb .check{font-size:13px;margin:4px 0}
+.kal-plan{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto;max-height:72vh}
+.kp-head,.kp-body{display:grid;min-width:560px}
+.kp-head{position:sticky;top:0;z-index:3;background:#f0f6f7;border-bottom:1px solid var(--line)}
+.kp-head .hcell{padding:8px 6px;text-align:center;font-size:12.8px;color:#3c565f;border-left:1px solid var(--line)}
+.kp-head .hcell:first-child{border-left:0}
+.kp-head .hcell strong{display:block;font-size:13.5px}
+.kp-head .hcell .muted{font-size:11px}
+.kp-times{position:relative}
+.kp-times span{position:absolute;right:6px;transform:translateY(-6px);font-size:10.5px;color:var(--muted)}
+.kp-col{position:relative;border-left:1px solid var(--line);background-image:repeating-linear-gradient(to bottom,var(--line) 0 1px,transparent 1px 44px)}
+.kp-ev{position:absolute;left:3px;right:3px;border-radius:8px;padding:3px 6px;font-size:11.3px;line-height:1.35;overflow:hidden;cursor:pointer;border:1px solid;border-left-width:3px;background:#fff}
+.kp-ev .t{font-weight:700}
+.kp-ev.geplant{background:var(--blue-l);border-color:#c8dcf5;border-left-color:var(--blue);color:#123f79}
+.kp-ev.stattgefunden{background:var(--green-l);border-color:#bfe8cd;border-left-color:var(--green);color:#0a5c2c}
+.kp-ev.ausgefallen{background:#f1f3f4;border-color:#d5dbdf;border-left-color:#a9b4ba;color:#5d686e;text-decoration:line-through}
+.kp-ev.verschoben{background:var(--amber-l);border-color:#f0dcb4;border-left-color:var(--amber);color:#6d4400}
+.kp-ev:hover{filter:brightness(.97);box-shadow:var(--shadow)}
+.kal-leer{padding:26px;text-align:center;color:var(--muted);font-size:13.5px}
+.wl-liste{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
+.wl-item{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fafcfd;font-size:13px}
+.wl-item .nm{font-weight:700;font-size:13.5px}
 .kalender-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
 .kalender-grid .wd{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center;padding:4px 0}
 .day{background:var(--card);border:1px solid var(--line);border-radius:11px;min-height:92px;padding:6px 7px;cursor:pointer;position:relative}

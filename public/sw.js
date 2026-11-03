@@ -1,7 +1,7 @@
 /* RheaSport – Service Worker: Network-first mit Cache-Fallback.
    Online immer aktuell, offline nutzbar (nach dem ersten Besuch). */
 'use strict';
-const CACHE = 'rheasport-shell-v2.1';
+const CACHE = 'rheasport-shell-v2.2';
 
 self.addEventListener('install', () => { self.skipWaiting(); });
 

@@ -34,18 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pages-Site aktivieren (falls noch nicht vorhanden)
-        run: |
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/pages")
-          echo "GET /pages -> $CODE"
-          if [ "$CODE" != "200" ]; then
-            curl -s -X POST -H "Authorization: Bearer ${{ github.token }}" -H "Accept: application/vnd.github+json" \
-              -d '{"build_type":"workflow"}' "https://api.github.com/repos/$GITHUB_REPOSITORY/pages" | head -c 300
-            echo
-          fi
-
-      - name: Setup Pages
+      - name: Setup Pages (aktiviert die Site bei Bedarf selbst)
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -144,6 +144,7 @@ let S = null;   // /api/state
 let D = null;   // Dashboard
 let termineCache = [];
 let aktuelleView = 'dashboard';
+let aktuelleSub = null;
 
 async function reload(renderView = true) {
   const [s, d] = await Promise.all([api('GET', '/api/state'), api('GET', '/api/dashboard')]);
@@ -164,14 +165,50 @@ function renderNavBadges() {
 }
 
 /* ----------------------------- Navigation ----------------------------- */
-$$('#nav button').forEach((b) => {
-  b.onclick = () => zeigeView(b.dataset.view);
+const VIEW_TITEL = {
+  dashboard: 'Übersicht', scan: 'Verordnungen', abrechnung: 'Abrechnungen', rechnungen: 'Rechnungen',
+  kalender: 'Termine', patienten: 'Patienten', aerzte: 'Ärzte', statistiken: 'Statistiken',
+  kassenbuch: 'Kassenbuch', trainer: 'Trainer & Eigenschaften', kurse: 'Kurse & Gruppen',
+  dokumente: 'Dokumente', postfach: 'E-Mail-Journal', einstellungen: 'Einstellungen',
+};
+
+/* Menü-Drawer (wie in der Vorlage: ☰ in der Kopfleiste, ✕ im Menü, Background mobil) */
+function openNav() { document.body.classList.add('nav-open'); }
+function closeNav() { document.body.classList.remove('nav-open'); }
+$('#nav-open').onclick = openNav;
+$('#nav-close').onclick = closeNav;
+$('#nav-backdrop').onclick = closeNav;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#modal-root').hidden && document.body.classList.contains('nav-open')) closeNav();
 });
-function zeigeView(view) {
+if (window.innerWidth > 900) document.body.classList.add('nav-open'); // Desktop: Menü offen starten
+
+$$('#nav button[data-view]').forEach((b) => {
+  b.onclick = () => zeigeView(b.dataset.view, b.dataset.sub);
+});
+$$('#nav .nav-toggle').forEach((b) => {
+  b.onclick = () => {
+    const g = b.closest('.nav-group');
+    const open = g.classList.toggle('open');
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+});
+
+function zeigeView(view, sub) {
   aktuelleView = view;
-  $$('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  aktuelleSub = sub || null;
+  $$('#nav button[data-view]').forEach((b) =>
+    b.classList.toggle('active', b.dataset.view === view && (b.dataset.sub || null) === (sub || null)));
+  if (view === 'statistiken') $('#grp-statistiken').classList.add('open');
+  const t = $('#topbar-title');
+  if (t) t.textContent = VIEW_TITEL[view] || view;
   $$('.view').forEach((v) => { v.hidden = v.id !== `view-${view}`; });
+  if (window.innerWidth <= 900) closeNav(); // mobil: Drawer nach Auswahl schließen
   renderAktuelleView();
+  if (sub) requestAnimationFrame(() => {
+    const el = document.getElementById(sub);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 function renderAktuelleView() {
   if (!S || !D) return;
@@ -183,6 +220,10 @@ function renderAktuelleView() {
     case 'kurse': renderKurse(); break;
     case 'kalender': renderKalender(); break;
     case 'abrechnung': renderAbrechnung(); break;
+    case 'rechnungen': renderRechnungen().catch((e) => toast(e.message, 'err')); break;
+    case 'aerzte': renderAerzte(); break;
+    case 'statistiken': renderStatistik(); break;
+    case 'kassenbuch': renderKassenbuch(); break;
     case 'dokumente': renderDokumente(); break;
     case 'postfach': renderPostfach(); break;
     case 'einstellungen': renderEinstellungen(); break;
@@ -2054,20 +2095,20 @@ async function renderStatistik() {
   $('#abr-stat').innerHTML = `<div class="card">
     <div class="row between"><h2 style="margin:0">Statistik ${esc(titel)}</h2>
       <div class="row"><button class="btn small" id="st-prev">‹</button><button class="btn small" id="st-heute">Heute</button><button class="btn small" id="st-next">›</button></div></div>
-    <div class="stats" style="margin-top:8px">
+    <div class="stats" id="st-kennzahlen" style="margin-top:8px">
       <div class="stat"><div class="n">${g.termine}</div><div class="t">Einheiten durchgeführt</div></div>
       <div class="stat"><div class="n">${g.geplantTermine}</div><div class="t">noch geplant</div></div>
       <div class="stat"><div class="n">${g.teilnahmen}</div><div class="t">Teilnahmen</div></div>
       <div class="stat"><div class="n">${g.ausgefallen}</div><div class="t">ausgefallen</div></div>
       <div class="stat"><div class="n">${g.abbrueche}</div><div class="t">Abbrüche</div></div>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Trainer/in</th><th>Stundenlohn €/Std.</th><th>Std. bisher</th><th>Verdienst bisher</th><th>Std. geplant</th><th>Voraussichtlich</th></tr></thead><tbody>
+    <div class="table-wrap" id="st-trainer"><table><thead><tr><th>Trainer/in</th><th>Stundenlohn €/Std.</th><th>Std. bisher</th><th>Verdienst bisher</th><th>Std. geplant</th><th>Voraussichtlich</th></tr></thead><tbody>
       ${st.trainer.map((t) => `<tr><td><strong>${esc(t.name)}</strong>${t.unbestaetigt ? `<div class="muted small">${t.unbestaetigt} vergangene Termine noch unbestätigt</div>` : ''}</td>
         <td><input type="number" step="0.01" min="0" class="tr-lohn" data-tid="${t.id}" value="${t.stundenlohn || ''}" style="width:90px"></td>
         <td>${t.stunden.toString().replace('.', ',')} <span class="muted small">(${t.termine} Termine)</span></td><td>${euroFmt(t.verdienst)}</td>
         <td>${t.geplantStunden.toString().replace('.', ',')}</td><td><strong>${euroFmt(t.prognose)}</strong></td></tr>`).join('') || '<tr><td colspan="6" class="muted">Keine Trainer/innen.</td></tr>'}
     </tbody></table></div>
-    <div class="grid2" style="margin-top:8px">
+    <div class="grid2" id="st-finanzen" style="margin-top:8px">
       <div class="item"><span class="muted">Trainerkosten bisher / voraussichtlich</span><strong>${euroFmt(g.trainerkosten)} / ${euroFmt(g.trainerkostenPrognose)}</strong></div>
       <div class="item"><span class="muted">Einnahmen bisher / voraussichtlich*</span><strong>${euroFmt(g.einnahmen)} / ${euroFmt(g.einnahmenPrognose)}</strong></div>
     </div>
@@ -2152,6 +2193,147 @@ window.markiereBezahlt = async (vid) => {
     await reload(true); renderAbrechnung(); toast('Als bezahlt markiert.', 'ok');
   } catch (e) { toast(e.message, 'err'); }
 };
+
+/* ============================== RECHNUNGEN ============================== */
+async function renderRechnungen() {
+  const r = await api('GET', '/api/abrechnung');
+  const filter = ($('#rec-filter') || {}).value || '';
+  let zeilen = r.zeilen.filter((z) => (z.fertig && (z.betrag || 0) > 0) || (z.abrechnung && z.abrechnung.rechnungsNr));
+  if (filter === 'offen') zeilen = zeilen.filter((z) => !z.bezahlt);
+  if (filter === 'bezahlt') zeilen = zeilen.filter((z) => z.bezahlt);
+  zeilen.sort((a, b) => String((b.abrechnung || {}).berechnetAm || '').localeCompare(String((a.abrechnung || {}).berechnetAm || '')));
+  const sumGes = zeilen.reduce((a, z) => a + (z.betrag || 0), 0);
+  const sumOff = zeilen.filter((z) => !z.bezahlt).reduce((a, z) => a + (z.betrag || 0), 0);
+  const sumBez = zeilen.filter((z) => z.bezahlt).reduce((a, z) => a + (z.betrag || 0), 0);
+  $('#rec-summen').innerHTML = `<div class="row" style="gap:14px;flex-wrap:wrap;margin:8px 0">
+    <span class="chip blue">${zeilen.length} Rechnungen</span>
+    <span class="chip">Summe: ${euroFmt(sumGes)}</span>
+    <span class="chip amber">Offene Posten: ${euroFmt(sumOff)}</span>
+    <span class="chip green">Bezahlt: ${euroFmt(sumBez)}</span></div>`;
+  $('#rec-tabelle tbody').innerHTML = zeilen.map((z) => `<tr>
+    <td>${(z.abrechnung || {}).rechnungsNr ? `<strong>${esc(z.abrechnung.rechnungsNr)}</strong>` : '<span class="muted">–</span>'}
+      ${(z.abrechnung || {}).berechnetAm ? `<div class="muted small">vom ${fmt(z.abrechnung.berechnetAm)}</div>` : ''}</td>
+    <td><button class="link" onclick="oeffnePatient('${esc(z.patientId || '')}')" style="font-weight:700;text-align:left">${esc(z.patient)}</button></td>
+    <td>${fmt(z.von)} – ${fmt(z.bis)}</td>
+    <td>${z.erbrachteUee}</td>
+    <td><strong>${(z.betrag || 0).toFixed(2).replace('.', ',')} €</strong></td>
+    <td>${statusChip(z.status)} ${z.bezahlt ? '<span class="chip green">bezahlt</span>' : '<span class="chip amber">offen</span>'}</td>
+    <td><div class="row" style="flex-wrap:wrap">
+      ${z.erbrachteUee > 0 ? `<button class="btn small" onclick="druckeRechnung('${z.id}')">🖨 Rechnung</button>` : ''}
+      ${!z.bezahlt ? `<button class="btn small primary" onclick="markiereBezahlt('${z.id}')">💰 Bezahlt</button>` : ''}
+    </div></td>
+  </tr>`).join('') || '<tr><td colspan="7" class="muted">Noch keine Rechnungen erzeugt – bitte eine Verordnung im Bereich „Abrechnungen“ abrechnen.</td></tr>';
+}
+$('#rec-filter').addEventListener('change', () => renderRechnungen().catch((e) => toast(e.message, 'err')));
+$('#btn-rec-refresh').onclick = () => renderRechnungen().catch((e) => toast(e.message, 'err'));
+
+/* ============================== ÄRZTE ============================== */
+const AERZTE_KEY = 'rhea-aerzte';
+const ladeAerzte = () => { try { return JSON.parse(localStorage.getItem(AERZTE_KEY)) || []; } catch (_) { return []; } };
+const speichereAerzte = (list) => localStorage.setItem(AERZTE_KEY, JSON.stringify(list));
+function arztVerordnungen(name) {
+  if (!name || !S) return 0;
+  const n = name.toLowerCase();
+  return (S.verordnungen || []).filter((v) => v.arzt && String(v.arzt).toLowerCase().includes(n)).length;
+}
+function renderAerzte() {
+  const q = (($('#aerzte-suche') || {}).value || '').trim().toLowerCase();
+  let list = ladeAerzte();
+  if (q) list = list.filter((a) => [a.name, a.praxis, a.ort, a.email, a.telefon].join(' ').toLowerCase().includes(q));
+  list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de'));
+  $('#aerzte-liste').innerHTML = list.map((a) => `<div class="karte">
+    <h3>🩺 ${esc(a.name)}${a.praxis ? ` <span class="muted small" style="font-weight:400">· ${esc(a.praxis)}</span>` : ''}</h3>
+    <div class="meta">
+      ${esc([a.strasse, a.plz || a.ort ? `${a.plz || ''} ${a.ort || ''}`.trim() : ''].filter(Boolean).join(', ')) || '–'}<br>
+      ${a.telefon ? `☎ ${esc(a.telefon)}<br>` : ''}${a.email ? `✉ ${esc(a.email)}<br>` : ''}
+      ${a.ik ? `IK: <span class="mono">${esc(a.ik)}</span><br>` : ''}
+      <span class="chip" style="margin-top:4px">${arztVerordnungen(a.name)} Verordnungen im Bestand</span>
+    </div>
+    <div class="acts">
+      <button class="btn small" onclick="arztEdit('${a.id}')">✏ Bearbeiten</button>
+      <button class="btn small danger" onclick="arztLoeschen('${a.id}')">🗑 Löschen</button>
+    </div>
+  </div>`).join('') || '<div class="card"><div class="muted">Noch keine Ärzte/Praxen gespeichert – über „+ Arzt/Praxis anlegen“ den ersten Eintrag erstellen. Beim Scan erfasste Arztnamen erscheinen zusätzlich in der Verordnung.</div></div>';
+}
+window.arztLoeschen = (id) => {
+  if (!confirm('Eintrag wirklich löschen?')) return;
+  speichereAerzte(ladeAerzte().filter((a) => a.id !== id));
+  renderAerzte(); toast('Eintrag gelöscht.', 'ok');
+};
+window.arztEdit = (id) => {
+  const a = (id && ladeAerzte().find((x) => x.id === id)) || {};
+  openModal(a.id ? 'Arzt/Praxis bearbeiten' : 'Arzt/Praxis anlegen', `
+    <div class="form2">
+      <label class="span2">Name (wie auf der Verordnung)<input id="az-name" value="${esc(a.name || '')}"></label>
+      <label>Praxis/Bezeichnung<input id="az-praxis" value="${esc(a.praxis || '')}"></label>
+      <label>Institutionskennzeichen (IK)<input id="az-ik" value="${esc(a.ik || '')}"></label>
+      <label class="span2">Straße &amp; Nr.<input id="az-strasse" value="${esc(a.strasse || '')}"></label>
+      <label>PLZ<input id="az-plz" value="${esc(a.plz || '')}"></label>
+      <label>Ort<input id="az-ort" value="${esc(a.ort || '')}"></label>
+      <label>Telefon<input id="az-telefon" value="${esc(a.telefon || '')}"></label>
+      <label>E-Mail<input id="az-email" type="email" value="${esc(a.email || '')}"></label>
+    </div>`, [
+    { label: 'Abbrechen', onClick: closeModal },
+    { label: '💾 Speichern', cls: 'btn primary', onClick: () => {
+      const name = $('#az-name').value.trim();
+      if (!name) { toast('Bitte einen Namen angeben.', 'err'); return; }
+      const list = ladeAerzte();
+      const rec = Object.assign({}, a, {
+        id: a.id || `arz_${Date.now().toString(36)}`, name,
+        praxis: $('#az-praxis').value.trim(), ik: $('#az-ik').value.trim(),
+        strasse: $('#az-strasse').value.trim(), plz: $('#az-plz').value.trim(), ort: $('#az-ort').value.trim(),
+        telefon: $('#az-telefon').value.trim(), email: $('#az-email').value.trim(),
+      });
+      const i = list.findIndex((x) => x.id === rec.id);
+      if (i >= 0) list[i] = rec; else list.push(rec);
+      speichereAerzte(list); closeModal(); renderAerzte(); toast('Gespeichert.', 'ok');
+    } },
+  ]);
+};
+$('#btn-arzt-neu').onclick = () => arztEdit(null);
+$('#aerzte-suche').addEventListener('input', renderAerzte);
+
+/* ============================== KASSENBUCH ============================== */
+const KB_KEY = 'rhea-kassenbuch';
+const ladeKb = () => { try { return JSON.parse(localStorage.getItem(KB_KEY)) || []; } catch (_) { return []; } };
+const speichereKb = (l) => localStorage.setItem(KB_KEY, JSON.stringify(l));
+function renderKassenbuch() {
+  const list = ladeKb().sort((a, b) => String(b.datum).localeCompare(String(a.datum)) || String(b.ts || '').localeCompare(String(a.ts || '')));
+  const ein = list.filter((e) => e.art === 'einnahme').reduce((a, e) => a + (Number(e.betrag) || 0), 0);
+  const aus = list.filter((e) => e.art === 'ausgabe').reduce((a, e) => a + (Number(e.betrag) || 0), 0);
+  $('#kb-summen').innerHTML = `<div class="row" style="gap:14px;flex-wrap:wrap;margin:0 0 10px">
+    <span class="chip green">Einnahmen: ${euroFmt(ein)}</span>
+    <span class="chip red">Ausgaben: ${euroFmt(aus)}</span>
+    <span class="chip blue">Saldo: ${euroFmt(ein - aus)}</span>
+    <span class="chip gray">${list.length} Einträge</span></div>`;
+  $('#kb-tabelle tbody').innerHTML = list.map((e) => `<tr>
+    <td>${fmt(e.datum)}</td>
+    <td>${esc(e.text)}</td>
+    <td>${e.art === 'einnahme' ? '<span class="chip green">Einnahme</span>' : '<span class="chip red">Ausgabe</span>'}</td>
+    <td>${esc(e.weg || '')}</td>
+    <td style="text-align:right"><strong>${e.art === 'ausgabe' ? '−' : '+'}${euroFmt(e.betrag)}</strong></td>
+    <td><button class="icon-btn" title="Eintrag löschen" onclick="kbLoeschen('${e.id}')">🗑</button></td>
+  </tr>`).join('') || '<tr><td colspan="6" class="muted">Noch keine Einträge – oben den ersten Eintrag speichern.</td></tr>';
+}
+window.kbLoeschen = (id) => {
+  if (!confirm('Eintrag löschen?')) return;
+  speichereKb(ladeKb().filter((e) => e.id !== id));
+  renderKassenbuch(); toast('Eintrag gelöscht.', 'ok');
+};
+$('#btn-kb-add').onclick = () => {
+  const text = $('#kb-text').value.trim();
+  const betrag = Math.round((Number($('#kb-betrag').value) || 0) * 100) / 100;
+  if (!text || betrag <= 0) { toast('Bitte Beschreibung und Betrag > 0 angeben.', 'err'); return; }
+  const list = ladeKb();
+  list.push({
+    id: `kb_${Date.now().toString(36)}`, datum: $('#kb-datum').value || heutigesISO(),
+    art: $('#kb-art').value, text, betrag, weg: $('#kb-weg').value, ts: new Date().toISOString(),
+  });
+  speichereKb(list);
+  $('#kb-text').value = ''; $('#kb-betrag').value = '';
+  renderKassenbuch(); toast('Eintrag gespeichert.', 'ok');
+};
+$('#kb-datum').value = heutigesISO();
 
 /* ---- Rechnungsdruck mit Terminübersicht ---- */
 window.druckeRechnung = (vid) => {

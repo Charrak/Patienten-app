@@ -37,7 +37,14 @@ function saveDb(db) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  
+
+  // Browser ohne Lokalmodus würden keine Daten sehen (API läuft im Gerät/Browser) -> automatisch in den Lokalmodus wechseln
+  if (url.pathname === '/' && !url.searchParams.has('local')) {
+    res.writeHead(302, { Location: '/?local=1' });
+    res.end();
+    return;
+  }
+
   // API routes - redirect to local-api in browser
   if (url.pathname.startsWith('/api/')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });

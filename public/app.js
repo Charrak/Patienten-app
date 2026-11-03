@@ -2810,11 +2810,28 @@ const scanCtrlRefresh = $('#btn-scan-ctrl-refresh');
 if (scanCtrlRefresh) scanCtrlRefresh.addEventListener('click', () => reload(true));
 
 /* ============================== START ============================== */
+/* Web-App (PWA): Service Worker nur im Browser über http(s), nicht in der APK */
+if ('serviceWorker' in navigator && !window.Capacitor
+  && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
 (async function start() {
   try {
     await reload(false);
     zeigeView('dashboard');
   } catch (e) {
+    /* Statisches Hosting (z. B. GitHub Pages, Ordner ohne Node-Server) oder Doppelklick auf index.html:
+       automatisch in den lokalen Modus wechseln – Daten bleiben dann in diesem Browser. */
+    if (!window.LOCAL_MODE && !window.Capacitor) {
+      try {
+        window.LOCAL_MODE = true;
+        await reload(false);
+        zeigeView('dashboard');
+        toast('Kein Server-API gefunden – lokaler Modus aktiv: Daten werden in diesem Browser gespeichert.', 'ok');
+        return;
+      } catch (e2) { /* unten anzeigen */ }
+    }
     document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif"><h2>Verbindung zum lokalen Server fehlgeschlagen</h2><p>${esc(e.message)}</p></div>`;
   }
 })();
